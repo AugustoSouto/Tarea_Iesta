@@ -1,0 +1,62 @@
+---
+numbersections: yes
+title: 'Tarea 1: Rmarkdown'
+author: "Augusto Souto-Pérez"
+date: "17 de septiembre de 2018"
+output: 
+ pdf_document:
+  fig_caption: yes
+includes:  
+      in_header: coso.tex
+geometry: margin=3cm
+---
+
+El archivo fuente se encuentra en: https://github.com/AugustoSouto/Tarea_R.
+
+#Introducción
+
+En este documento se presentan los resultados de la simulación de dos vectores aleatorios: "y" y "x". Los mismos cuentan con largo de "N" observaciones, donde "N" es una variable aleatoria escalar.
+
+Los vectores aleatorios y la variable "N" se distribuyen de la siguiente forma:
+
+$$N \sim Poisson(90)$$ 
+$$X_{i} \sim Uniforme(0,1)$$ 
+$$Y_{i} \sim Uniforme(0,1)$$ 
+
+```{r include=FALSE}
+library(xtable)
+set.seed(1)
+n=rpois(1, 90)
+x=runif(n, 0, 1)
+y=runif(n, 0, 1)
+df=data.frame(y,x)
+tab=xtable(df, caption = "Tablas", label = "Etiqueta")
+```
+
+#Simulaciones y Tabla
+
+Datos simulados:
+
+En la tabla REF se observa que la mediana de las x es 
+```{r, results='asis',echo=FALSE}
+median(df$x)
+```
+
+de forma que el valor de la mediana se complete automáticamente cuando cambian
+los datos.
+
+```{r xtable, results='asis', echo=FALSE}
+tab=xtable(summary(df), caption = "REF", label="Etiqueta")
+print(tab, type = "latex", caption.placement = "top", comment=FALSE)
+```
+
+\newpage
+
+#Figura
+
+\vspace{0.5cm}
+
+```{r, echo=FALSE, fig.cap="\\label{fig:figs}Dispersión"}
+plot(x,y)
+```
+\\
