@@ -1,0 +1,241 @@
+---
+title: 'Tarea 2: Dplyr'
+author: "Augusto Souto-Pérez"
+output: 
+ pdf_document:
+  fig_caption: yes
+geometry: margin=3cm
+numbersections: yes
+keep_tex: yes
+header-includes: \usepackage{float}
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message=FALSE,warning=FALSE, fig.cap = "...")
+```
+
+Para la tarea, se usan los siguientes datos, que provienen de la base de datos abiertos del estado uruguayo. El paquete de base para su análisis es dplyr, que brinda una serie de comandos que hacen más facil el manejo de los mismos.
+
+```{r dat, echo=TRUE}
+
+gastolink="https://catalogodatos.gub.uy/dataset/96e636e5-4f78-49a7-8e14-60e90173a0c0/resource/936ac9e6-b0f6-424a-9b53-ee408a91fd6f/download/datos_gastos-por-actos-mdicos-2016.csv"
+
+gastos <- read.csv(gastolink, header = TRUE, dec = ",", encoding="latin1")
+
+library(dplyr)
+
+options(scipen=999)
+```
+
+
+#Ejercicio 1
+
+
+##Prestacion con mas cantidad de actos medicos en Montevideo.
+Las prestaciones más repetidas se detallan a continuación. Como se observa, en la capital, el cateterismo es la principal prestación.
+```{r}
+gastos %>% filter(Departamento_residencia=="MONTEVIDEO") %>% {table(gastos$Prestacion)} %>% 
+  sort(decreasing=TRUE) %>% head() 
+
+variable=gastos$Departamento_residencia %>% table() %>% sort(decreasing = TRUE)
+```
+##Prestadores de Salud
+Los principales prestadores de salud a nivel nacional son las Instituciones de Asistencia Médica Colectiva, seguidas por ASSE. 
+```{r }
+gastos$Prestador_tipo %>% table() %>% sort(decreasing = TRUE) 
+```
+
+
+##Cantidad de pacientes
+La base procesada cuenta con casi veite mil pacientes.
+```{r }
+gastos$Paciente %>% unique() %>% length()
+
+```
+
+##Conjunto de datos donde cada paciente es una fila
+Aqui se detalla el codigo utilizado para crear una base donde las filas tienen solo un paciente. Para cada fila se tienen las características generales así como también está la cantidad de visitas médicas y el gasto realizado en todas ellas.
+
+```{r }
+d1=gastos %>%
+group_by(Paciente) %>% summarise(Visita=n()) %>% data.frame()
+
+```
+
+
+```{r }
+d2=gastos %>% 
+  group_by(Paciente, Edad_años, Sexo, 
+           Departamento_residencia)  %>%
+  summarise_at(vars(Importe), funs(sum))  %>% data.frame()  
+
+library(plyr)
+df=d1 %>% join( d2, by="Paciente") 
+colnames(df)[c(6)]=c("Gasto_Total")
+head(df)
+```
+
+
+#Ejercicio 2
+
+##Replica del Grafico 1
+
+```{r, fig.cap="\\label{fig:figs}Replica del Grafico 1 ", out.extra='', fig.pos="H" }
+library(ggplot2)
+library(forcats)
+
+df_para_grafico=variable %>% data.frame() %>% 
+  mutate(tot=sum(Freq)) %>% mutate(porcentaje=Freq/tot)
+
+rownames(df_para_grafico)=df_para_grafico$.
+df_para_grafico=df_para_grafico[order(df_para_grafico$porcentaje, decreasing = FALSE),]
+
+ggplot(df_para_grafico, aes(porcentaje,fct_reorder(., porcentaje))) +
+geom_point()+
+labs(x="Departamento de residencia", y="Proporción de actos médicos")
+```
+
+##Replica del Grafico 2
+
+```{r, fig.cap="\\label{fig:figs}Replica del Grafico 2", out.extra='', fig.pos="H" }
+gastos2=gastos %>% filter(Departamento_residencia=="MONTEVIDEO")
+
+ggplot(gastos2, aes((fct_infreq(gastos2$Prestacion))))+
+geom_bar()+
+theme(axis.text.x=element_text(angle=90,size=4))  +
+labs(x="", y="Total de actos médicos")
+
+```
+
+##Replica del Grafico 3
+
+```{r , out.extra='', fig.pos="H", fig.cap="\\label{fig:figs}Replica del Grafico 3" }
+datgraf=gastos %>% mutate(v=ifelse(Prestador_tipo=="ASSE", 1, 0))
+
+ggplot(datgraf,aes(x=fct_reorder(.f=Prestacion,.x=v, .fun=mean, .desc=FALSE),fill = Prestador_tipo))+
+geom_bar(position="fill")+
+coord_flip()+
+theme(axis.text.y = element_text(size=6,hjust=0,vjust=.5),
+legend.title=element_text(size=4), 
+    legend.text=element_text(size=5), 
+    plot.title = element_text(size = 12, face = "bold"), 
+    legend.position="bottom")+
+    labs(x="Proporción", y="Tipo de Prestación")
+```
+
+
+#Ejercicio 3
+
+
+##A
+
+En el siguiente gráfico se observa la distribución de las prestaciones según el prestador del servicio médico. Como se observa, CASMU y la Asociación Española fueron las prestadoras líderes, superando las 2000 prestaciones cada una. En tercer lugar, se ubica Médica Uruguaya, con un número de prestaciones de entre 1500 y 2000 prestaciones. Como permite observar el gráfico, el resto de los prestadores tienen una escala bastante menor a dichos valores. \
+
+```{r }
+detach("package:plyr", unload=TRUE)
+dat=gastos %>% filter(Prestador_departamento=="MONTEVIDEO") %>% 
+  count(Prestador) %>%  mutate(perc=n/sum(n)) %>%
+  arrange(desc(n)) %>% data.frame() 
+```
+
+```{r, ,fig.cap="\\label{fig:figs}Instituciones con mas actos medicos",fig.pos="H", , out.extra='' }
+library(ggthemes)
+ggplot(dat, aes(n,fct_reorder(Prestador, n))) +
+geom_point()+
+theme(axis.text.y = element_text(size=4,hjust=0,vjust=.5))+
+labs(x="Prestaciones", y="Prestador")+
+theme_economist()
+```
+
+
+
+
+##B
+
+Como se puede ver, el gasto tiene una mediana similar para hombres y mujeres de distintos tipos de prestaciones. Los seguros privados de salud y otros tienen una dispersión menor al los dos tipos restantes de prestadores, resultado que es esperable dado que estos dos tipos de prestación tienen un número menor de afiliados que ASSE o IAMC. \
+
+Tambien puede observarse que, sobre todo en IAMC y seguros privados de salud, la dispersión en el gasto es algo mayor para las personas de sexo masculino, lo que quizá está vinculado a el tipo de prestaciones que recibe cada sexo.  \
+
+```{r, ,fig.cap="\\label{fig:figs}Gasto y Prestador ", fig.pos="H", , out.extra='' }
+
+
+ggplot(gastos, aes(y=log(Importe), x=Prestador_tipo, color=Sexo)) +
+  geom_boxplot() +
+  labs(x="Prestadores por tipo") +
+  theme_economist()+
+  ggtitle("Dispersión del gasto segun el tipo de prestador")
+```  
+
+
+  
+
+##C
+
+El importe de los pacientes, según lo que puede observarse del gráfico, no es muy diferente según su sexo o tipo de prestador. Si puede observarse en el gráfico que las personas más jovenes tienden a tener prestaciones algo más costosas, lo que también podría estar explicado por la distribución de las prestaciones por edad. \
+
+```{r, ,fig.cap="\\label{fig:figs}Edad, Sexo e Importe de los Pacientes", fig.pos="H", out.extra='' }
+ggplot(gastos, aes(x=Edad_anos, y=Importe, color=Sexo, fill=Sexo) )+
+geom_point()+
+geom_smooth(method = "lm", se = FALSE)+
+theme_economist()+
+facet_grid(~ Prestador_tipo)+
+labs(x="Edad", y="Importe")+
+  theme(strip.text.x = element_text(size = 8))
+```  
+
+
+
+
+##D
+
+
+Cuando se añade la dimensión espacial y el importe medio al análisis se pueden ver algunas características adicionales. En particular, se resalta que los servicios regulados como los que brinda ASSE y IAMC tienen una dispersión del importe medio por departamento mucho menor al de los seguros privados y otros servicios. También es posible observar que algunos departamentos tienen un importe medio muy superior al del resto para ambos sexos como por ejemplo Lavalleja para el gasto de hombres en otros y de mujeres en servicio privado, Tacuarembo para el seguro privado de hombres y Rocha para el importe medio de las mujeres en otros.  \
+
+
+```{r, ,fig.cap="\\label{fig:figs}Importe y tipo de Prestador", fig.pos="H", out.extra='' }
+dat=gastos %>% 
+group_by(Departamento_residencia,
+Sexo, Prestador_tipo) %>% 
+summarise(imp_medio=mean(Importe)) %>% data.frame() 
+
+ggplot(dat, aes(x=Prestador_tipo, y=imp_medio, color=Departamento_residencia, fill=Sexo) )+
+geom_point()+
+theme_economist()+
+facet_grid(~ Sexo)+
+labs(x="Tipo de Prestador", y="Importe Medio")+
+theme(axis.text.x=element_text(angle=10,size=8),
+legend.title=element_text(size=6), 
+    legend.text=element_text(size=5), 
+    legend.position="bottom")
+```  
+
+
+
+
+##E
+
+Observando en el gráfico las prestaciones, su cantidad de realizaciones y el importe medio que tuvieron se puede responder parcialmente a la pregunta de si las prestaciones más comunes son las mas caras o no. \
+
+En particular, el gráfico muestra que las prestaciones más comunes distan de ser las más costosas por importe promedio. Las prestaciones más costosas tienden a estar bastante alejadas de los primeros lugares del ranking de prestaciones por frecuencia. Por lo tanto, las prestaciones comunes no parecen ser las más caras. \
+
+
+
+
+```{r, ,fig.cap="\\label{fig:figs}Relacion Entre el Tipo de Prestacion, el Gasto Total en esta y el Importe Promedio", fig.pos="H" }
+dat<-gastos %>% 
+    group_by(Prestacion) %>% 
+    summarize(n = n(), sumimp = sum(Importe), 
+              imp_prom = sumimp/n) %>% 
+    mutate(perc = sumimp/sum(n)) %>%
+    arrange(desc(perc))
+    
+ggplot(dat, aes(n, fct_reorder(factor(as.numeric(Prestacion)), n), size=imp_prom))+
+geom_point()+
+  labs(x="Numero de Prestaciones", y="Prestacion")+
+  geom_text(data = dat, aes(label = Prestacion), 
+                            position = position_dodge(width=0.5),  size=1)+
+   theme_economist()
+```  
+
+
